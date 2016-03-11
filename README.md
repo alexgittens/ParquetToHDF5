@@ -6,4 +6,5 @@ mpiless-concat.py is for error-checking: it merges the HDF5 files by opening eac
 TODO:
  - give a script front-end to dumpToHDF5Chunks.py and concat.py to let them be called sequentially on an arbitrary dataset and potentially also do other operations like transposition at the same time
  - do better error-checking, maybe write formal tests
+ - gather on multiple processes and write out w/ h5py-parallel
 

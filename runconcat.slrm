@@ -3,8 +3,10 @@
 #SBATCH -p regular
 #SBATCH --mem-per-cpu=3500
 #SBATCH -N 48
-#SBATCH -t 17:00:00
+#SBATCH -t 10:00:00
 #SBATCH --qos=premium
 
+
+# meant to run the concatenation code on the complete data 
 module load h5py mpi4py
 srun -c 1 -n 1152 --mem-per-cpu=3500 python-mpi -u concat.py
