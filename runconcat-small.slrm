@@ -7,5 +7,5 @@
 #SBATCH --qos=premium
 
 # meant to test the hdf5 chunk concatenation code on a small scale
-module load h5py mpi4py
+module load h5py-parallel mpi4py
 srun -c 1 -n 240 --mem-per-cpu=3500 python-mpi -u concat.py

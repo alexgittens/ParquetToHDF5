@@ -14,11 +14,10 @@ import math
 
 rank = MPI.COMM_WORLD.Get_rank()
 numProcs = MPI.COMM_WORLD.Get_size()
-numWriters = 20
+numWriters = 10
 writerRanks = list(np.arange(numWriters))
 chunkSize = 4000
 
-writeBuf = np.zeros((chunkSize*numWriters, numCols), dtype=np.float64)
 
 datapath = "/global/cscratch1/sd/gittens/hdf5-export/data"
 basefname = "chunkOut"
@@ -37,6 +36,7 @@ for (idx, fname) in enumerate(myfiles):
     buf = np.empty((myhandles[idx].get("indices").size,), dtype=np.int32)
     myhandles[idx].get("indices").read_direct(buf)
     myrowindices[idx] = buf.tolist()
+mymaxrownum = max([len(l) for l in myrowindices])
 
 mynumrows = MPI.COMM_WORLD.gather(mynumrows, root=0)
 if rank == 0:
@@ -46,9 +46,14 @@ else:
 numRows = MPI.COMM_WORLD.bcast(numRows, root=0)
 numCols = myhandles[0].get("values").shape[1]
 
-# set the chunkSize to be the same as the chunks we're writing out, and use highest level of compression because this file is huge
+# DEBUGGING
+numRows = 9510
+chunkSize = 200
+
+
+# set the chunkSize to be the same as the chunks we're writing out
 fout = h5py.File(join(datapath, "oceanTemps.hdf5"), "w", driver="mpio", comm=MPI.COMM_WORLD)
-temperature = fout.create_dataset("temperatures", (numRows, numCols), dtype=np.float64, compression=9, chunks=(chunkSize, numCols))
+temperature = fout.create_dataset("temperatures", (numRows, numCols), dtype=np.float64, chunks=(chunkSize, numCols))
 
 startrow = 0
 while startrow < numRows:
@@ -60,6 +65,7 @@ while startrow < numRows:
     # find the indices from each process that are within the rowRange, and the corresponding rows
     foundIndices = []
     foundRows = []
+    writeBuf = np.zeros((mymaxrownum, numCols), dtype=np.float64)
     for (fhIndex, fh) in enumerate(myhandles):
         intersect = sorted(list( set(myrowindices[fhIndex]) & rowRange))
         if len(intersect) > 0:
@@ -67,6 +73,8 @@ while startrow < numRows:
             rowIndexOffsets = [myrowindices[fhIndex].index(rowindex) for rowindex in intersect]
             fh.get("values").read_direct(writeBuf, dest_sel=np.s_[0:fh.get("indices").size, :])
             foundRows.extend([writeBuf[offset, :] for offset in rowIndexOffsets])
+    if rank == 0:
+        print "%s : done searching for relevant rows" % time.asctime(time.localtime())
 
     # the writers do chunkSize aligned output to avoid IO contention
     # divide up the indices and rows so they are assigned to the correct writer processes
@@ -76,13 +84,17 @@ while startrow < numRows:
     rowsForWriter = []
     for writerIdx in np.arange(numWritersNeeded):
         writerOffsets = [foundIndices.index(rowIdx) for rowIdx in 
-                           filter(lambda rowIdx: (rowIdx >= chunkOffset[writerIdx] and rowIdx < chunkOffset[writerIdx] + chunkSize), foundIndices)]
+                           filter(lambda rowIdx: (rowIdx >= chunkOffsets[writerIdx] and rowIdx < chunkOffsets[writerIdx] + chunkSize), foundIndices)]
         indicesForWriter.append([foundIndices[rowOffset] for rowOffset in writerOffsets])
         rowsForWriter.append([foundRows[rowOffset] for rowOffset in writerOffsets])
+    if rank == 0:
+        print "%s : done assigning rows to writers" % time.asctime(time.localtime())
 
     for writerIdx in np.arange(numWritersNeeded):
         indicesForWriter[writerIdx] = MPI.COMM_WORLD.gather(indicesForWriter[writerIdx], root=writerRanks[writerIdx])
-        rowsForWriter[writerIdx] = MPI.COMM_WORLD.gather(rowsForWrtier[writerIdx], root=writerRanks[writerIdx])
+        rowsForWriter[writerIdx] = MPI.COMM_WORLD.gather(rowsForWriter[writerIdx], root=writerRanks[writerIdx])
+    if rank == 0:
+        print "%s : done gathering rows to writers" % time.asctime(time.localtime())
 
     if rank in writerRanks[0:numWritersNeeded]:
         writerRankIndex = writerRanks.index(rank)
@@ -94,10 +106,10 @@ while startrow < numRows:
             sortedIndices = [allIndices[offset] for offset in orderOffsets]
             sortedRows = [allRows[offset] for offset in orderOffsets]
 
-            with temperature.collective:
-                writerstartrow
-                writerendrow 
-                temperature[writerstartrow:writerendrow, :] = np.array(sortedRows)
+            writerstartrow = sortedIndices[0]
+            writerendrow = sortedIndices[-1] + 1
+            temperature[writerstartrow:writerendrow, :] = np.array(sortedRows)
+        print "%s : done writing from process %d" % (time.asctime(time.localtime()), rank)
 
     MPI.COMM_WORLD.barrier()
     if rank == 0:
@@ -108,5 +120,4 @@ while startrow < numRows:
 for handle in myhandles:
     handle.close()
 
-if rank == 0:
-    fout.close()
+fout.close()

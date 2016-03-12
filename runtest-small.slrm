@@ -1,0 +1,18 @@
+#!/bin/bash -l
+
+#SBATCH -p debug
+#SBATCH -N 24
+#SBATCH -t 00:30:00
+#SBATCH --ccm
+#SBATCH --qos=premium
+
+bash
+module load h5py spark/1.5.1
+start-all.sh
+spark-submit --master $SPARKURL \
+             --executor-memory 20G \
+             --driver-memory 20G \
+             --conf spark.worker.timeout=1200000 \
+             --conf spark.network.timeout=1200000 \
+             --conf spark.driver.maxResultSize=10G \
+             test-concat-small.py
