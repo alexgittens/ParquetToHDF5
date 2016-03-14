@@ -8,5 +8,5 @@
 
 
 # meant to run the concatenation code on the complete data 
-module load h5py mpi4py
+module load h5py-parallel mpi4py
 srun -c 1 -n 1152 --mem-per-cpu=3500 python-mpi -u concat.py

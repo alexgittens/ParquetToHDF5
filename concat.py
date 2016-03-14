@@ -46,6 +46,10 @@ else:
 numRows = MPI.COMM_WORLD.bcast(numRows, root=0)
 numCols = myhandles[0].get("values").shape[1]
 
+if rank == 0:
+    print "%s : Creating file and dataset" % time.asctime(time.localtime())
+    print "Note: for some reason, h5py in parallel mode takes a really long time to create a large dataset, so you might be waiting a while (e.g., with about 1152 processes, 1 hour or so for a 2.2Tb dataset)"
+
 # set the chunkSize to be the same as the chunks we're writing out
 fout = h5py.File(join(datapath, "oceanTemps.hdf5"), "w", driver="mpio", comm=MPI.COMM_WORLD)
 temperature = fout.create_dataset("temperatures", (numRows, numCols), dtype=np.float64, chunks=(chunkSize, numCols))
