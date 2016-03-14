@@ -18,9 +18,8 @@ indices = list(np.arange(numRows))
 h5rows = np.array(temps)
 
 df = sqlContext.read.load(oceanTempsParquetFile)
-sparkrows = np.array(map(lambda pair: pair[1], 
-                         sorted(df.rdd.filter(lambda row : row[0] in indices)
-                                  .collect(), key = lambda pair: pair[0])))
+data = sorted(df.rdd.filter(lambda row: row[0] in indices).collect(), key= lambda pair: pair[0])
+sparkrows = np.array(map(lambda pair: pair[1], data))
 
 print np.linalg.norm(h5rows - sparkrows)
 
