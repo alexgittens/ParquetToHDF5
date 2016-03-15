@@ -1,0 +1,13 @@
+#!/bin/bash -l
+
+#SBATCH -p regular
+#SBATCH --mem-per-cpu=3500
+#SBATCH -N 48
+#SBATCH -t 00:50:00
+#SBATCH --qos=premium
+
+# meant to test the hdf5 chunk concatenation code on a small scale
+module load h5py mpi4py
+srun -c 3 -n 384 --mem-per-cpu=3500 python-mpi -u partition.py
+exit
+

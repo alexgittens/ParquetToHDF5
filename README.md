@@ -1,10 +1,22 @@
-dumpToHDF5Chunks.py loads a specified IndexedRowMatrix in Spark from Parquet, without caching, and writes each partition out as an HDF5 file (hence it makes sense to ensure there are fewer partitions) containing the actual rows in that partition as one dataset, and the corresponding row indices as another dataset. We don't assume that the rows are stored in consecutive order.
-concat.py uses MPI4Py to merge these HDF5 files into one big file where the rows are in consecutive order. It does this by dividing the HDF5 files evenly across all the processes, then the root process asks each node to return all the rows it contains within a certain sized window that moves along the rows of the final matrix. As each chunk of rows is received from the processes, the root sorts them into consecutive order and writes them out to the final file.
-runconcat.slrm is a SLURM batch file for use on Cori for running concat.py
-mpiless-concat.py is for error-checking: it merges the HDF5 files by opening each one sequentially and writing its rows directly to the correct row in the final matrix.
+dumpToHDF5Chunks.py loads a specified IndexedRowMatrix in Spark from Parquet,
+without caching, and writes each partition out as an HDF5 file (hence it makes
+sense to ensure there are fewer partitions) containing the actual rows in that
+partition as one dataset, and the corresponding row indices as another dataset.
+We don't assume that the rows are stored in consecutive order.
+
+concat.py uses MPI4Py to merge these HDF5 files into one big file where the
+rows are in consecutive order. It does this by dividing the input HDF5 files evenly
+across all the processes and using several processes to write to the same file simultaneously using hdf5-parallel.
+A certain size window moves along the rows of the final matrix, and each process sends 
+the relevant rows from all of its assigned files to the writers handling the appropriate part of that window.
+As each chunk of rows is received from the processes, the
+writers sort them into consecutive order and writes them out to the final file.
+
+partition.py uses MPI4Py to divide the large HDF5 file into many smaller chunks
+and writes them out to compressed HDF5 files for faster transfer, in an
+embarassingly parallel manner.
 
 TODO:
- - give a script front-end to dumpToHDF5Chunks.py and concat.py to let them be called sequentially on an arbitrary dataset and potentially also do other operations like transposition at the same time
+ - give a script front-end to dumpToHDF5Chunks.py, concat.py, partition.py to let them be called sequentially on an arbitrary dataset and potentially also do other operations like transposition at the same time
  - do better error-checking, maybe write formal tests
- - gather on multiple processes and write out w/ h5py-parallel
 
